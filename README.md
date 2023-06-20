@@ -14,7 +14,7 @@ This Django REST API project showcases the implementation of a scalable and modu
 1. Clone the repository:
     
     ```
-    git clone <https://github.com/your-username/your-repository.gi
+    git clone https://github.com/Monil-Karia/Company-RESTful_API.git
     ```
     
 2. Navigate to the project directory:
