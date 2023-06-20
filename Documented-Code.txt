@@ -1,0 +1,147 @@
+# api/models.py
+
+from django.db import models
+
+# Company model represents a company with various fields such as name, location, about, type, added_data, and active.
+class Company(models.Model):
+    company_id = models.AutoField(primary_key=True)
+    name = models.CharField(max_length=50)
+    location = models.CharField(max_length=50)
+    about = models.TextField()
+    type = models.CharField(
+        max_length=100,
+        choices=(
+            ("IT", "IT"),
+            ("Non IT", "Non IT"),
+            ("Mobile Phones", "Mobile Phones"),
+        ),
+    )
+    added_data = models.DateTimeField(auto_now=True)
+    active = models.BooleanField(default=True)
+
+    def __str__(self):
+        return self.name + ' Location:' + self.location
+
+
+# Employee model represents an employee with fields such as name, email, address, phone, about, position, and company.
+# It establishes a one-to-many relationship with the Company model using ForeignKey.
+class Employee(models.Model):
+    name = models.CharField(max_length=50)
+    email = models.CharField(max_length=50)
+    address = models.CharField(max_length=200)
+    phone = models.CharField(max_length=10)
+    about = models.TextField(max_length=50)
+    position = models.CharField(max_length=50, choices=(
+        ('Manager', 'Manager'),
+        ('Project Leader', 'PL'),
+        ('Software Developer', 'SD'),
+    ))
+    company = models.ForeignKey(Company, on_delete=models.CASCADE)
+
+    def __str__(self):
+        return self.name
+
+
+# api/serializers.py
+
+from rest_framework import serializers
+from api.models import Company, Employee
+
+# CompanySerializer serializes the Company model
+class CompanySerializer(serializers.HyperlinkedModelSerializer):
+    company_id = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Company
+        fields = "__all__"
+
+
+# EmployeeSerializer serializes the Employee model
+class EmployeeSerializer(serializers.HyperlinkedModelSerializer):
+    id = serializers.ReadOnlyField()
+
+    class Meta:
+        model = Employee
+        fields = "__all__"
+
+
+# api/views.py
+
+from django.shortcuts import render
+from rest_framework import viewsets
+from api.models import Company, Employee
+from api.serializers import CompanySerializer, EmployeeSerializer
+from rest_framework.decorators import action
+from rest_framework.response import Response
+
+# CompanyViewSet handles CRUD operations for the Company model
+class CompanyViewSet(viewsets.ModelViewSet):
+    queryset = Company.objects.all()
+    serializer_class = CompanySerializer
+
+    # Custom API endpoint: companies/{companyID}/employees
+    @action(detail=True, methods=['get'])
+    def employees(self, request, pk=None):
+        try:
+            # Retrieve the company based on the provided primary key (pk)
+            company = Company.objects.get(pk=pk)
+
+            # Filter employees based on the company
+            emps = Employee.objects.filter(company=company)
+
+            # Serialize the employee data
+            emp_serializer = EmployeeSerializer(emps, many=True, context={'request': request})
+            return Response(emp_serializer.data)
+        except Exception as e:
+            print(e)
+            return Response({
+                'message': 'Company might not exist! Error'
+            })
+
+# EmployeeViewSet handles CRUD operations for the Employee model
+class EmployeeViewSet(viewsets.ModelViewSet):
+    queryset = Employee.objects.all()
+    serializer_class = EmployeeSerializer
+
+
+# api/urls.py
+
+from django.contrib import admin
+from django.urls import path, include
+from api.views import CompanyViewSet, EmployeeViewSet
+from rest_framework import routers
+
+# Router maps the desired URLs to the corresponding viewsets
+router = routers.DefaultRouter()
+router.register(r'companies', CompanyViewSet)
+router.register(r'employees', EmployeeViewSet)
+
+urlpatterns = [
+    # Blank URL means Companies will take the companies from the desired
+    path('', include(router.urls))
+]
+
+
+# config/settings.py
+
+# Django REST Framework settings
+REST_FRAMEWORK = {
+    # Use Django's standard `django.contrib.auth` permissions,
+    # or allow read-only access for unauthenticated users.
+    'DEFAULT_PERMISSION_CLASSES': [
+        'rest_framework.permissions.DjangoModelPermissionsOrAnonReadOnly'
+    ],
+    'DEFAULT_RENDERER_CLASSES': (
+        'rest_framework.renderers.JSONRenderer',
+    )
+}
+
+
+# api/admin.py
+
+from django.contrib import admin
+from api.models import Company, Employee
+
+# Register the Company and Employee models in the admin site
+admin.site.register(Company)
+admin.site.register(Employee)
